@@ -2,10 +2,19 @@ import './App.css';
 import * as tf from '@tensorflow/tfjs'
 import * as handpose from '@tensorflow-models/handpose'
 import Webcam from 'react-webcam'
-import { useRef } from 'react';
+import { useRef , useState } from 'react';
 import { drawHand } from './Utilities'
-function App() {
+import thumbs_up from './thums_up.png'
+import victory from './victory.webp'
 
+import *  as fp from 'fingerpose'
+
+
+
+
+function App() {
+  const [emoji, setEmoji] = useState(null)
+  const images = {thumbs_up : thumbs_up, victory : victory }
   const webcamref = useRef(null)
   const canvasref = useRef(null)
   const runHandPose = async () => {
@@ -14,9 +23,7 @@ function App() {
     setInterval(() =>{
       detect(net)
     }, 100)
-
     //LOOP DETECT HANDS
-
   };
 
   const detect = async (net) => {
@@ -35,7 +42,27 @@ function App() {
       canvasref.current.height = videoHeight
       
       const hand = await net.estimateHands(video)
-    
+
+      if(hand.length > 0) {
+        const GE = new fp.GestureEstimator([
+          fp.Gestures.VictoryGesture,
+          fp.Gestures.ThumbsUpGesture
+        ])
+
+        const gesture = await GE.estimate(hand[0].landmarks, 8)
+        if(gesture.gestures !== undefined && gesture.gestures.length > 0) {
+            const confidence = gesture.gestures.map(
+              (prediction) => prediction.score
+            )
+
+          const maxConfidence = confidence.indexOf(
+            Math.max.apply(null, confidence)
+          )
+
+          setEmoji(gesture.gestures[maxConfidence].name);
+        }
+      }
+
       const ctx = canvasref.current.getContext("2d")
       
       drawHand(hand,ctx)
@@ -80,7 +107,17 @@ function App() {
       >
 
       </canvas>
-
+      {
+        emoji == null ? "" : <img 
+                                src={images[emoji]} 
+                                style={{
+                                  position: "absolute",
+                                  height: 100,
+                                  zindex : 1000
+                                }}  
+                                
+                              />
+      }
     </div>
   );
 }
